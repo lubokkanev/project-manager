@@ -1,48 +1,68 @@
 package lubokkanev.revisionmanager;
 
-import lubokkanev.revisionmanager.file.FileLoader;
+import lubokkanev.revisionmanager.file.Loader;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class Project {
-   private final File dir;
-   private FileLoader fileLoader = new FileLoader();
+    private File dir;
+    private File latestDir;
+    private Loader loader;
+    private List<Object> objects = new ArrayList<>(); // FIXME: maybe use a set
 
-   public Project(File dir) {
-      this.dir = dir;
-   }
+    public Project(File dir) {
+        this.dir = dir;
+        latestDir = new File(dir + "/" + "current");
+        loader = new Loader(dir);
+    }
 
-   public void order() {
-      List<ObjectFile> files = getObjectFiles();
+    public void order() {
+        for (ObjectFile file : loader.getObjectFiles()) {
+            addObjectAndFile(file);
+        }
 
-      for (ObjectFile file : files) {
-         order(file);
-      }
-   }
+        for (Object object : objects) {
+            order(object);
+        }
+    }
 
-   private List<ObjectFile> getObjectFiles() {
-      return fileLoader.getFiles(dir).stream()
-            .map(ObjectFile::new)
-            .collect(Collectors.toList());
-   }
+    private void addObjectAndFile(ObjectFile file) {
+        Object object = null;
+        for (Object obj : objects) {
+            if (obj.getName().equals(file.getObjectName())) { // FIXME: if we are using a set, move this logic in the equals method
+                object = obj;
+                break;
+            }
+        }
 
-   private void order(ObjectFile file) {
-      copyToObjectFolder(file);
-      setTheLatestRevision(file);
-   }
+        if (object == null) {
+            object = new Object(dir, file.getObjectName());
+            objects.add(object);
+        }
 
-   private void copyToObjectFolder(ObjectFile file) {
-      // TODO
-   }
+        object.addFile(file);
+    }
 
-   private void setTheLatestRevision(ObjectFile file) {
-      Object object = file.getObject();
-      ObjectFile currentLatest = object.getLatest();
+    private void order(Object object) {
+        object.createAndFillObjectFolder();
+        putTheLatestRevision(object);
+    }
 
-      if (file.moreRecent(currentLatest)) { // inverse?
-         object.setLatest(file);
-      }
-   }
+    private void putTheLatestRevision(Object object) {
+        if (!latestDir.exists() && !latestDir.mkdirs()) {
+            throw new RuntimeException("Failed to create directory: '" + latestDir.getAbsolutePath() + "'.");
+        }
+
+        for (File file : latestDir.listFiles()) {
+            if (file.getName().startsWith(object.getName())) {
+                if (!file.delete()) {
+                    System.err.println("Failed to delete the latest revision file: '" + file.getAbsolutePath() + "'.");
+                }
+            }
+        }
+
+        object.getLatest().copyTo(latestDir);
+    }
 }
