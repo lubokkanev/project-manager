@@ -55,12 +55,15 @@ public class Project {
             throw new RuntimeException("Failed to create directory: '" + latestDir.getAbsolutePath() + "'.");
         }
 
-        for (File file : latestDir.listFiles()) {
-            if (file.getName().startsWith(object.getName())) {
-                if (!file.delete()) {
+        File[] files = latestDir.listFiles();
+        if (files != null) {
+           for (File file : files) {
+              if (file.getName().startsWith(object.getName())) {
+                 if (!file.delete()) {
                     System.err.println("Failed to delete the latest revision file: '" + file.getAbsolutePath() + "'.");
-                }
-            }
+                 }
+              }
+           }
         }
 
         object.getLatest().copyTo(latestDir);
